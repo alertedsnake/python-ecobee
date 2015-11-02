@@ -4,5 +4,5 @@ __pycache__/*
 python
 dist/
 build/
-apikey.txt
+config.txt
 python_ecobee.egg-info/

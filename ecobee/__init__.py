@@ -8,8 +8,6 @@ import requests
 import os
 import shelve
 
-logging.basicConfig(level=logging.INFO, format='%(levelname)s %(name)s:%(lineno)d %(message)s')
-
 APIVERSION = '1'
 REPORT_COLUMNS = (
     'auxHeat1', 'auxHeat2', 'auxHeat3',
