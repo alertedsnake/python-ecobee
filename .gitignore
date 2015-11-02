@@ -5,4 +5,4 @@ python
 dist/
 build/
 apikey.txt
-ecobee.egg-info/
+python_ecobee.egg-info/

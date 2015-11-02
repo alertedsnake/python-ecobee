@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-PACKAGE_NAME = 'ecobee'
+PACKAGE_NAME = 'python-ecobee'
 
 PACKAGES = find_packages(exclude=['tests', 'tests.*', 'python'])
 
