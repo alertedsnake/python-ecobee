@@ -48,6 +48,9 @@ class Ecobee(object):
         else:
             self.thermostat_ids = [thermostat_ids]
 
+        # make sure we have strings here
+        self.thermostat_ids = list(str(tid) for tid in self.thermostat_ids)
+
         self.url_base = 'https://api.ecobee.com/'
         self.url_api = self.url_base + APIVERSION + '/{endpoint}'
 
