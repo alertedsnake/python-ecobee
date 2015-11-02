@@ -23,13 +23,6 @@ class EcobeeException(Exception):
     """Ecobee error"""
     pass
 
-#    def __init__(self, response):
-#        try:
-#            data = response.json()
-#            super().__init__('{}: {}'.format(data['status']['code'], data['status']['message']))
-#        except ValueError:
-#            super().__init__(response.text)
-
 
 class Ecobee(object):
     """Ecobee thermostat.
@@ -39,7 +32,6 @@ class Ecobee(object):
     """
     def __init__(self, apikey, thermostat_ids, scope='smartWrite', authfile=None):
         """
-
           apikey:         your API key in the 'Developer' panel on ecobee.com
           thermostat_ids: IDs of your thermostats
           authfile:       Store authentication in this file.
@@ -78,6 +70,7 @@ class Ecobee(object):
         # authorize on start
         self.authorize_refresh()
 
+
     @property
     def authentication_required(self):
         return self.auth.get('required', True)
@@ -113,10 +106,10 @@ class Ecobee(object):
         self.auth['refresh_token'] = None
 
         self.log.info("""Please log onto the ecobee web portal, log in, select the menu
-item in the top right (3 lines), and select MY APPS.
+in the top right (3 lines), and select MY APPS.
 Next, click Add Application and enter the following
 authorization code: {pin}
-Then follow the prompts to add the Quick Home/Away app.
+Then follow the prompts to add your application.
 You have {expiry} minutes.
 """.format(pin=result['ecobeePin'], expiry=result['expires_in']))
 
@@ -124,7 +117,6 @@ You have {expiry} minutes.
     def authorize_finish(self):
         """Finish authorization after the user has allowed access
         at the Ecobee website."""
-
 
         if not self.auth.get('access_token'):
             self.log.info("No access token, can't finish?")
@@ -166,6 +158,7 @@ You have {expiry} minutes.
 
     def _authorize_update(self, response):
         """Update cached authentication"""
+
         if not response.ok:
             result = response.json()
             self.log.error(result['error_description'])
@@ -181,7 +174,9 @@ You have {expiry} minutes.
 
 
     def thermostatSummary(self):
-        """Summary of available thermostats"""
+        """ /thermostatSummary
+        Summary of available thermostats"""
+
         return self.get("thermostatSummary", {
                             "selection": {
                                 "selectionType": "registered",
@@ -191,7 +186,8 @@ You have {expiry} minutes.
 
 
     def thermostat(self, includeDevice=False, includeProgram=False, includeRuntime=False, includeEvents=False, includeEquipmentStatus=False, includeSensors=False):
-        """Return info about the thermostat"""
+        """ /thermostat
+        Return info about the thermostat."""
 
         data = self.get("thermostat", {
             "selection": {
@@ -209,13 +205,10 @@ You have {expiry} minutes.
 
 
     def runtimeReport(self, start_date=None, includeSensors=False, columns=REPORT_COLUMNS):
-        """
-        https://www.ecobee.com/home/developer/api/documentation/v1/operations/get-runtime-report.shtml
-        start_date should be coming from the installation; if an empty one
-        is passed, use 30 minutes ago for unit test purposes
+        """ /runtimeReport
+        start_date defaults to 1 day ago.
 
-        Date/time is in thermostat time.
-        TEMPS ARE IN F
+        Date/time is in thermostat time,  Temps are in Fahrenheit.
 
         NOTE: This request should not be made at an interval of less than
         15 minutes as the data on the server only changes every 15 minutes
@@ -271,8 +264,6 @@ You have {expiry} minutes.
         return updated
 
 
-
-
     @property
     def _headers(self):
         return {
@@ -323,17 +314,16 @@ You have {expiry} minutes.
         except ValueError:
             raise (response.text)
 
+
     def _raw_get(self, endpoint, **kwargs):
+        """Mostly-raw GET used for authentication API"""
         h = {'Content-Type': 'application/json;charset=UTF-8'}
         url = self.url_base + endpoint
         return requests.get(url, params=kwargs, headers=h)
 
 
     def _raw_post(self, endpoint, **kwargs):
+        """Mostly-raw POST used for authentication API"""
         h = {'Content-Type': 'application/json;charset=UTF-8'}
         url = self.url_base + endpoint
         return requests.post(url, params=kwargs, headers=h)
-
-#        print(response)
-#        print(response.headers)
-#        print(response.url)
