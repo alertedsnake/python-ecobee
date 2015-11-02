@@ -1,0 +1,8 @@
+.*.swp
+*.pyc
+__pycache__/*
+python
+dist/
+build/
+apikey.txt
+ecobee.egg-info/
