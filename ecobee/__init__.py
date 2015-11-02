@@ -188,7 +188,7 @@ You have {expiry} minutes.
                         })
 
 
-    def thermostat(self, includeDevice=False, includeProgram=False, includeRuntime=False, includeEvents=False, includeEquipmentStatus=False, includeSensors=False):
+    def thermostat(self, includeDevice=False, includeProgram=False, includeRuntime=False, includeEvents=False, includeEquipmentStatus=False, includeSensors=False, includeSettings=False):
         """ /thermostat
         Return info about the thermostat."""
 
@@ -196,11 +196,12 @@ You have {expiry} minutes.
             "selection": {
                 "selectionType":  "thermostats",
                 "selectionMatch": ":".join(self.thermostat_ids),
-                "includeDevice":  includeDevice,
-                "includeProgram": includeProgram,
-                "includeRuntime": includeRuntime,
-                "includeEvents":  includeEvents,
-                'includeSensors': includeSensors,
+                "includeDevice":   includeDevice,
+                "includeSettings": includeSettings,
+                "includeProgram":  includeProgram,
+                "includeRuntime":  includeRuntime,
+                "includeEvents":   includeEvents,
+                'includeSensors':  includeSensors,
                 "includeEquipmentStatus": includeEquipmentStatus,
             }
         })
