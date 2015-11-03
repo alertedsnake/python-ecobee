@@ -222,6 +222,9 @@ You have {expiry} minutes.
                 self.thermostatSummary()
             thermostat_ids = self.thermostat_ids
 
+        elif not isinstance(thermostat_ids, list):
+            thermostat_ids = [thermostat_ids]
+
         data = self.get("thermostat", {
             "selection": {
                 "selectionType":  "thermostats",
@@ -317,6 +320,10 @@ You have {expiry} minutes.
 
     def get_thermostat(self, thermostat_id):
         """return a Thermostat object for the given thermostat"""
+        thermostat_id = str(thermostat_id)
+        if not self.thermostat_ids:
+            self.update()
+
         if thermostat_id in self.thermostat_ids:
             return Thermostat(self, thermostat_id)
 
