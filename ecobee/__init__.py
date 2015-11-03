@@ -329,6 +329,9 @@ You have {expiry} minutes.
 
     def list_thermostats(self):
         """Return list of thermostats"""
+        if not self.thermostat_ids:
+            self.update()
+
         return list(Thermostat(self, tid) for tid in self.thermostat_ids)
 
 
@@ -550,6 +553,7 @@ class Sensor(object):
         for obj in self._status.get('capability', []):
             if obj['type'] == key:
                 return obj
+        return {}
 
     def poll(self):
         """Calls the parent's poll()"""
