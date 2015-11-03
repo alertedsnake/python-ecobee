@@ -40,10 +40,10 @@ class Client(object):
        eapi = ecobee.Client(apikey, themostat_ids)
 
     """
-    def __init__(self, apikey, thermostat_ids, scope='smartWrite', authfile=None):
+    def __init__(self, apikey, scope='smartWrite', thermostat_ids=None, authfile=None):
         """
           apikey:         your API key in the 'Developer' panel on ecobee.com
-          thermostat_ids: IDs of your thermostats
+          thermostat_ids: IDs of your thermostats, otherwise discover
           authfile:       Store authentication in this file.
                           Default=$HOME/.config/ecobee
           scope:          Default: smartWrite
@@ -53,25 +53,29 @@ class Client(object):
         self.log = logging.getLogger(__name__)
         self.scope = scope
         self.apikey = apikey
-        if isinstance(thermostat_ids, list):
-            self.thermostat_ids = thermostat_ids
-        else:
-            self.thermostat_ids = [thermostat_ids]
+        self.thermostat_ids = []
 
-        # make sure we have strings here
-        self.thermostat_ids = list(str(tid) for tid in self.thermostat_ids)
+        # Map of most recent data
+        self._status = {}
+
+        if thermostat_ids:
+            if isinstance(thermostat_ids, list):
+                self.thermostat_ids = thermostat_ids
+            else:
+                self.thermostat_ids = [thermostat_ids]
+
+            # make sure we have strings here
+            self.thermostat_ids = list(str(tid) for tid in self.thermostat_ids)
+
+            # setup the stats
+            for tid in self.thermostat_ids:
+                self._status[tid] = {}
 
         self.url_base = 'https://api.ecobee.com/'
         self.url_api = self.url_base + APIVERSION + '/{endpoint}'
 
-
         # Map of thermostat ID to the last revision seen.
         self.lastSeen = {}
-
-        # Map of most recent data
-        self._status = {}
-        for tid in self.thermostat_ids:
-            self._status[tid] = {}
 
         # setup authentication storage
         self.auth = {}
@@ -189,18 +193,33 @@ You have {expiry} minutes.
     def thermostatSummary(self):
         """Summary of available thermostats.  Calls API endpoint /thermostatSummary """
 
-        return self.get("thermostatSummary", {
+        data = self.get("thermostatSummary", {
                             "selection": {
                                 "selectionType": "registered",
                                 "selectionMatch": "",
                             }
                         })
 
+        # go through the returned thermostat IDs and add
+        # to the list we've cached if we haven't seen
+        # them before
+        for row in data['revisionList']:
+            tid = row.split(':', 1)[0]
+            if tid not in self.thermostat_ids:
+                self.thermostat_ids.append(tid)
+                self._status[tid] = {}
+
+        return data
+
 
     def update(self, thermostat_ids=None, includeProgram=False, includeEvents=False):
         """Update cached info about the thermostats.  Calls API endpoint /thermostat """
 
+        # none specified, use them all
         if not thermostat_ids:
+            # no ids means we have to go fetch them
+            if not self.thermostat_ids:
+                self.thermostatSummary()
             thermostat_ids = self.thermostat_ids
 
         data = self.get("thermostat", {
