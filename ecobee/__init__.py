@@ -37,7 +37,7 @@ class EcobeeException(Exception):
 class Client(object):
     """Ecobee thermostat.
 
-       eapi = Connection(apikey, themostat_ids)
+       eapi = ecobee.Client(apikey, themostat_ids)
 
     """
     def __init__(self, apikey, thermostat_ids, scope='smartWrite', authfile=None):
