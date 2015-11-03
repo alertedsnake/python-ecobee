@@ -1,3 +1,7 @@
+# vim: set fileencoding=utf-8
+"""
+A simple library to talk to an Ecobee (https://www.ecobee.com) thermostat.
+"""
 
 __author__ = 'Michael Stella <ecobee@thismetalsky.org>'
 
@@ -18,16 +22,22 @@ REPORT_COLUMNS = (
     'zoneHumidity', 'zoneHumidityHigh', 'zoneHumidityLow', 'zoneHvacMode', 'zoneOccupancy'
 )
 
+STATUS_SECTIONS = ('device', 'equipmentStatus', 'events', 'runtime',
+                   'remoteSensors', 'program', 'settings',
+)
+UNITS_F = '°F'
+UNITS_C = '°C'
+
 
 class EcobeeException(Exception):
     """Ecobee error"""
     pass
 
 
-class Ecobee(object):
+class Client(object):
     """Ecobee thermostat.
 
-       eapi = Ecobee(apikey, themostat_ids)
+       eapi = Connection(apikey, themostat_ids)
 
     """
     def __init__(self, apikey, thermostat_ids, scope='smartWrite', authfile=None):
@@ -59,9 +69,9 @@ class Ecobee(object):
         self.lastSeen = {}
 
         # Map of most recent data
-        self.data = {}
+        self._status = {}
         for tid in self.thermostat_ids:
-            self.data[tid] = {}
+            self._status[tid] = {}
 
         # setup authentication storage
         self.auth = {}
@@ -177,8 +187,7 @@ You have {expiry} minutes.
 
 
     def thermostatSummary(self):
-        """ /thermostatSummary
-        Summary of available thermostats"""
+        """Summary of available thermostats.  Calls API endpoint /thermostatSummary """
 
         return self.get("thermostatSummary", {
                             "selection": {
@@ -188,28 +197,40 @@ You have {expiry} minutes.
                         })
 
 
-    def thermostat(self, includeDevice=False, includeProgram=False, includeRuntime=False, includeEvents=False, includeEquipmentStatus=False, includeSensors=False, includeSettings=False):
-        """ /thermostat
-        Return info about the thermostat."""
+    def update(self, thermostat_ids=None, includeProgram=False, includeEvents=False):
+        """Update cached info about the thermostats.  Calls API endpoint /thermostat """
+
+        if not thermostat_ids:
+            thermostat_ids = self.thermostat_ids
 
         data = self.get("thermostat", {
             "selection": {
                 "selectionType":  "thermostats",
-                "selectionMatch": ":".join(self.thermostat_ids),
-                "includeDevice":   includeDevice,
-                "includeSettings": includeSettings,
-                "includeProgram":  includeProgram,
-                "includeRuntime":  includeRuntime,
-                "includeEvents":   includeEvents,
-                'includeSensors':  includeSensors,
-                "includeEquipmentStatus": includeEquipmentStatus,
+                "selectionMatch": ":".join(thermostat_ids),
+                "includeEquipmentStatus":   True,
+                "includeDevice":            True,
+                "includeSettings":          True,
+                "includeRuntime":           True,
+                'includeSensors':           True,
+                "includeProgram":           includeProgram,
+                "includeEvents":            includeEvents,
             }
         })
-        return {thermostat['identifier']: thermostat for thermostat in data['thermostatList']}
+        for thermostat in data['thermostatList']:
+
+            # remap the sensors as a dict
+            sensors = {}
+            for sensor in thermostat['remoteSensors']:
+                sensors[sensor['id']] = sensor
+            thermostat['remoteSensors'] = sensors
+
+            # store it
+            self._status[thermostat['identifier']] = thermostat
 
 
-    def runtimeReport(self, start_date=None, includeSensors=False, columns=REPORT_COLUMNS):
-        """ /runtimeReport
+    def runtimeReport(self, thermostat_ids=None, start_date=None, includeSensors=False, columns=[]):
+        """ Get a full runtime report. Calls API endpoint /runtimeReport
+
         start_date defaults to 1 day ago.
 
         Date/time is in thermostat time,  Temps are in Fahrenheit.
@@ -227,9 +248,16 @@ You have {expiry} minutes.
            sensorList
 
         """
+        if not columns:
+            columns = REPORT_COLUMNS
+
+        if not thermostat_ids:
+            thermostat_ids = self.thermostat_ids
+
         end_date = datetime.date.today()
         if not start_date:
             start_date = end_date - datetime.timedelta(days=1)
+
         data = {
             'startDate':      start_date.strftime('%Y-%m-%d'),
             'endDate':        end_date.strftime('%Y-%m-%d'),
@@ -237,7 +265,7 @@ You have {expiry} minutes.
             'includeSensors': includeSensors,
             'selection': {
                 "selectionType":  "thermostats",
-                "selectionMatch": ":".join(self.thermostat_ids),
+                "selectionMatch": ":".join(thermostat_ids),
             }
         }
         return self.get('runtimeReport', data)
@@ -266,6 +294,16 @@ You have {expiry} minutes.
                 updated.append(identifier)
                 self.lastSeen[identifier] = intervalRevision
         return updated
+
+
+    def get_thermostat(self, thermostat_id):
+        """return a Thermostat object for the given thermostat"""
+        if thermostat_id in self.thermostat_ids:
+            return Thermostat(self, thermostat_id)
+
+    def list_thermostats(self):
+        """Return list of thermostats"""
+        return list(Thermostat(self, tid) for tid in self.thermostat_ids)
 
 
     @property
@@ -302,7 +340,6 @@ You have {expiry} minutes.
 
 
     def _handle_error(self, response):
-        self.log.debug(response.text)
         try:
             data = response.json()
             # code 16 = auth revoked, clear the token and start again
@@ -312,10 +349,13 @@ You have {expiry} minutes.
                 return self.authorize_start()
 
             # otherwise just raise it
-            raise EcobeeException('{}: {}'.format(data['status']['code'], data['status']['message']))
+            errmsg = '{}: {}'.format(data['status']['code'], data['status']['message'])
+            self.log.error(errmsg)
+            raise EcobeeException(errmsg)
 
         # failed to parse the JSON so this must be bad
         except ValueError:
+            self.log.error(response.text)
             raise (response.text)
 
 
@@ -323,11 +363,163 @@ You have {expiry} minutes.
         """Mostly-raw GET used for authentication API"""
         h = {'Content-Type': 'application/json;charset=UTF-8'}
         url = self.url_base + endpoint
-        return requests.get(url, params=kwargs, headers=h)
+        try:
+            return requests.get(url, params=kwargs, headers=h)
+        except requests.exceptions.ConnectionError as e:
+            self.log.error(e)
+            raise EcobeeException("Connection error: {}".format(e))
 
 
     def _raw_post(self, endpoint, **kwargs):
         """Mostly-raw POST used for authentication API"""
         h = {'Content-Type': 'application/json;charset=UTF-8'}
         url = self.url_base + endpoint
-        return requests.post(url, params=kwargs, headers=h)
+        try:
+            return requests.post(url, params=kwargs, headers=h)
+        except requests.exceptions.ConnectionError as e:
+            self.log.error(e)
+            raise EcobeeException("Connection error: {}".format(e))
+
+
+class Thermostat(object):
+    """Ecobee thermostat.
+
+    This class is a thin wrapper around the data in
+    eapi._status[thermostat_id].
+
+    """
+
+    def __init__(self, eapi, thermostat_id):
+        self._eapi = eapi
+        self.id = thermostat_id
+
+    @property
+    def _status(self):
+        return self._eapi._status[self.id]
+
+    @property
+    def name(self):
+        """Thermostat name"""
+        return self._status.get('name', 'pending')
+
+    @property
+    def settings(self):
+        """Settings dict"""
+        return self._status.get('settings', {})
+
+    @property
+    def runtime(self):
+        """Runtime status dict"""
+        return self._status.get('runtime', {})
+
+    @property
+    def running(self):
+        """List of running equiptment"""
+        return self._status.get('equipmentStatus', [])
+
+    @property
+    def sensors(self):
+        """Sensors dict"""
+        return self._status.get('remoteSensors', {})
+
+
+    def get_sensor(self, id):
+        """Return a sensor object given the ID"""
+        if id in self.sensors:
+            return Sensor(self, id)
+
+    def list_sensors(self):
+        """Return a list of sensor objects"""
+        return list(Sensor(self, k) for k in self.sensors.keys())
+
+
+    def poll(self):
+        """Polls for an update.  Returns true if there's data available"""
+        updates = self._eapi.poll()
+
+        # already got status and nothing new is available
+        if 'name' in self._status and self.id not in updates:
+            return False
+        return True
+
+
+    def update(self):
+        """Calls update() on this thermostat"""
+        self._eapi.update(self.id)
+
+
+    def _get_report(self, **kwargs):
+        """Wrapper for eapi.thermostatReport"""
+
+        try:
+            data = self._eapi.thermostatReport(self.id, **kwargs)
+            return data.get(self.id, {})
+        except EcobeeException:
+            pass
+
+
+class Sensor(object):
+    """An Ecobee remote sensor
+
+    This class is a thin wrapper around the data in
+    eapi._status[thermostat.id]['remoteSensors'][sensor_id].
+
+    """
+
+    def __init__(self, thermostat, sensor_id):
+        self.thermostat = thermostat
+        self.id = sensor_id
+
+    @property
+    def _eapi(self):
+        return self.thermostat._eapi
+
+    @property
+    def _status(self):
+        return self.thermostat.sensors.get(self.id, {})
+
+    @property
+    def name(self):
+        """Sensor name"""
+        return self._status.get('name', 'pending')
+
+    @property
+    def type(self):
+        """Sensor type"""
+        return self._status.get('type')
+
+    @property
+    def temperature(self):
+        """Return temperature (float) or None if not supported"""
+        val = self._get_capability('temperature').get('value')
+        if val:
+            return int(val) / 10.0
+
+    @property
+    def humidity(self):
+        """Return humidity (float) or None if not supported"""
+        val = self._get_capability('humidity').get('value')
+        if val:
+            return int(val) / 10.0
+
+    @property
+    def occupancy(self):
+        """Return occupancy (boolean) or None if not supported"""
+        val = self._get_capability('occupancy').get('value')
+        if val:
+            return val == 'true'
+
+    def _get_capability(self, key):
+        """Get a capability from the array"""
+        for obj in self._status.get('capability', []):
+            if obj['type'] == key:
+                return obj
+
+    def poll(self):
+        """Calls the parent's poll()"""
+        return self.thermostat.poll()
+
+    def update(self):
+        """Calls the parent's update()"""
+        self.thermostat.update()
+
