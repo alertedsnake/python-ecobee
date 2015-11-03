@@ -319,11 +319,16 @@ You have {expiry} minutes.
         self.authorize_refresh()
 
         url = self.url_api.format(endpoint=endpoint)
-        r = requests.get(url, params = {'json': json.dumps(data)}, headers=self._headers)
-        if not r.ok:
-            self._handle_error(r)
-        else:
-            return r.json()
+        try:
+            r = requests.get(url, params = {'json': json.dumps(data)}, headers=self._headers)
+            if not r.ok:
+                self._handle_error(r)
+            else:
+                return r.json()
+
+        except requests.exceptions.ConnectionError as e:
+            self.log.error(e)
+            raise EcobeeException("Connection error: {}".format(e)) from None
 
 
     def post(self, endpoint, data):
@@ -331,12 +336,17 @@ You have {expiry} minutes.
         self.authorize_refresh()
 
         url = self.url_api.format(endpoint=endpoint)
-        r = requests.get(url, data = json.dumps(data), headers=self._headers)
+        try:
+            r = requests.get(url, data = json.dumps(data), headers=self._headers)
 
-        if not r.ok:
-            self._handle_error(r)
-        else:
-            return r.json()
+            if not r.ok:
+                self._handle_error(r)
+            else:
+                return r.json()
+
+        except requests.exceptions.ConnectionError as e:
+            self.log.error(e)
+            raise EcobeeException("Connection error: {}".format(e)) from None
 
 
     def _handle_error(self, response):
@@ -355,8 +365,8 @@ You have {expiry} minutes.
 
         # failed to parse the JSON so this must be bad
         except ValueError:
-            self.log.error(response.text)
-            raise (response.text)
+            self.log.error("Response not JSON: {}".format(response.text))
+            raise EcobeeException("Response not JSON: {}".format(response.text)) from None
 
 
     def _raw_get(self, endpoint, **kwargs):
@@ -367,7 +377,7 @@ You have {expiry} minutes.
             return requests.get(url, params=kwargs, headers=h)
         except requests.exceptions.ConnectionError as e:
             self.log.error(e)
-            raise EcobeeException("Connection error: {}".format(e))
+            raise EcobeeException("Connection error: {}".format(e)) from None
 
 
     def _raw_post(self, endpoint, **kwargs):
@@ -378,7 +388,7 @@ You have {expiry} minutes.
             return requests.post(url, params=kwargs, headers=h)
         except requests.exceptions.ConnectionError as e:
             self.log.error(e)
-            raise EcobeeException("Connection error: {}".format(e))
+            raise EcobeeException("Connection error: {}".format(e)) from None
 
 
 class Thermostat(object):
