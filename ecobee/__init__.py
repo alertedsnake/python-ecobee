@@ -40,13 +40,14 @@ class Client(object):
        eapi = ecobee.Client(apikey, themostat_ids)
 
     """
-    def __init__(self, apikey, scope='smartWrite', thermostat_ids=None, authfile=None):
+    def __init__(self, apikey, scope='smartWrite', thermostat_ids=None, authfile=None, authstore=None):
         """
           apikey:         your API key in the 'Developer' panel on ecobee.com
-          thermostat_ids: IDs of your thermostats, otherwise discover
-          authfile:       Store authentication in this file.
-                          Default=$HOME/.config/ecobee
           scope:          Default: smartWrite
+          thermostat_ids: IDs of your thermostats, otherwise discover
+          authfile:       Store authentication in this shelve file.
+                          Default=$HOME/.config/ecobee
+          authstore:      Provide your own dict-like authentication cache store
 
         """
 
@@ -79,10 +80,15 @@ class Client(object):
 
         # setup authentication storage
         self.auth = {}
-        if authfile:
-            self.auth = shelve.open(authfile)
+        # use provided authentiation
+        if authstore:
+            self.auth = authstore
+        # use shelve - this is not thread safe!
         else:
-            self.auth = shelve.open(os.path.join(os.getenv('HOME'), '.config', 'ecobee'))
+            if authfile:
+                self.auth = shelve.open(authfile)
+            else:
+                self.auth = shelve.open(os.path.join(os.getenv('HOME'), '.config', 'ecobee'))
 
         # authorize on start
         self.authorize_refresh()
