@@ -231,6 +231,8 @@ You have {expiry} minutes.
         elif not isinstance(thermostat_ids, list):
             thermostat_ids = [thermostat_ids]
 
+        self.log.info("Updating IDs {}".format(thermostat_ids))
+
         data = self.get("thermostat", {
             "selection": {
                 "selectionType":  "thermostats",
@@ -483,7 +485,7 @@ class Thermostat(object):
         updates = self._eapi.poll()
 
         # already got status and nothing new is available
-        if 'name' in self._status and self.id not in updates:
+        if ('name' in self._status) and (self.id not in updates):
             return False
         return True
 
