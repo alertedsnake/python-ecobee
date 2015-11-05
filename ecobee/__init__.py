@@ -439,6 +439,7 @@ class Thermostat(object):
     def __init__(self, eapi, thermostat_id):
         self._eapi = eapi
         self.id = thermostat_id
+        self.lastSeen = None
 
     @property
     def _status(self):
@@ -469,6 +470,22 @@ class Thermostat(object):
         """Sensors dict"""
         return self._status.get('remoteSensors', {})
 
+    @property
+    def updated(self):
+        """When was this last updated"""
+        # not updated yet
+        if not self.lastSeen:
+            if self.id in self._eapi.lastSeen:
+                self.lastSeen = self._eapi.lastSeen[self.id]
+                return True
+
+        # updated
+        elif self.lastSeen < self._eapi.lastSeen[self.id]:
+            self.lastSeen = self._eapi.lastSeen[self.id]
+            return True
+
+        return False
+
 
     def get_sensor(self, id):
         """Return a sensor object given the ID"""
@@ -482,17 +499,13 @@ class Thermostat(object):
 
     def poll(self):
         """Polls for an update.  Returns true if there's data available"""
-        updates = self._eapi.poll()
-
-        # already got status and nothing new is available
-        if ('name' in self._status) and (self.id not in updates):
-            return False
-        return True
+        return self._eapi.poll()
 
 
     def update(self):
         """Calls update() on this thermostat"""
-        self._eapi.update(self.id)
+        if self.id in self.poll():
+            return self._eapi.update(self.id)
 
 
     def _get_report(self, **kwargs):
@@ -555,6 +568,10 @@ class Sensor(object):
         val = self._get_capability('occupancy').get('value')
         if val:
             return val == 'true'
+
+    @property
+    def updated(self):
+        return self.thermostat.updated
 
     def _get_capability(self, key):
         """Get a capability from the array"""
