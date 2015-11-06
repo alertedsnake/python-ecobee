@@ -96,6 +96,11 @@ class Thermostat(object):
             pass
 
 
+    def setHold(self, **kwargs):
+        """Set a hold"""
+        self._eapi.setHold(self.id, **kwargs)
+
+
 class Sensor(object):
     """An Ecobee remote sensor
 

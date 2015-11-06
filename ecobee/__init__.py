@@ -303,6 +303,51 @@ You have {expiry} minutes.
         return self.get('runtimeReport', data)
 
 
+    def setHold(self, thermostat_id, holdType='nextTransition', heatHoldTemp=None, coolHoldTemp=None,
+                holdHours=None, startDate=None, endDate=None, startTime=None, endTime=None):
+        """Set a hold at the given temperatures"""
+
+        if not heatHoldTemp and not coolHoldTemp:
+            raise ValueError("either 'heatHoldTemp' or 'coolHoldTemp' is required")
+
+        # defaults for these are the current temperature
+        if not heatHoldTemp:
+            heatHoldTemp = self._status[thermostat_id]['runtime']['desiredHeat']
+        else:
+            heatHoldTemp = heatHoldTemp * 10
+
+        if not coolHoldTemp:
+            coolHoldTemp = self._status[thermostat_id]['runtime']['desiredCool']
+        else:
+            coolHoldTemp = coolHoldTemp * 10
+
+        params = {
+            'holdType':     holdType,
+            'heatHoldTemp': heatHoldTemp,
+            'coolHoldTemp': coolHoldTemp,
+        }
+
+        if holdType == 'holdHours':
+            params['holdHours'] = holdHours
+
+        if holdType == 'dateTime':
+            params['startDate'] = startDate
+            params['endDate']   = endDate
+            params['startTime'] = startTime
+            params['endTime']   = endTime
+
+        return self.post('thermostat', {
+            "selection": {
+                "selectionType":  "thermostats",
+                "selectionMatch": thermostat_id,
+            },
+            "functions": [{
+                "type": "setHold",
+                "params": params,
+            }]
+        })
+
+
     def poll(self):
         """
         Return a list of thermostat IDs that have been updated since the last poll.
