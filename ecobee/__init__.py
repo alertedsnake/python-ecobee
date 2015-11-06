@@ -314,12 +314,12 @@ You have {expiry} minutes.
         if not heatHoldTemp:
             heatHoldTemp = self._status[thermostat_id]['runtime']['desiredHeat']
         else:
-            heatHoldTemp = heatHoldTemp * 10
+            heatHoldTemp = int(heatHoldTemp * 10)
 
         if not coolHoldTemp:
             coolHoldTemp = self._status[thermostat_id]['runtime']['desiredCool']
         else:
-            coolHoldTemp = coolHoldTemp * 10
+            coolHoldTemp = int(coolHoldTemp * 10)
 
         params = {
             'holdType':     holdType,
