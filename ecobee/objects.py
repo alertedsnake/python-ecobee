@@ -100,6 +100,22 @@ class Thermostat(object):
         """Set a hold"""
         self._eapi.setHold(self.id, **kwargs)
 
+    def setClimate(self, holdClimateRef, **kwargs):
+        """Shortcut to setClimate"""
+        self._eapi.setHold(self.id, holdClimateRef=holdClimateRef, **kwargs)
+
+    def setHome(self, **kwargs):
+        """Shortcut to set 'home' climate"""
+        self.setClimate('home', **kwargs)
+
+    def setAway(self, **kwargs):
+        """Shortcut to set 'away' climate"""
+        self.setClimate('away', **kwargs)
+
+    def resumeProgram(self):
+        """Shortcut to resume program"""
+        self._eapi.resumeProgram(self.id)
+
 
 class Sensor(object):
     """An Ecobee remote sensor

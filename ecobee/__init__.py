@@ -303,29 +303,54 @@ You have {expiry} minutes.
         return self.get('runtimeReport', data)
 
 
-    def setHold(self, thermostat_id, holdType='nextTransition', heatHoldTemp=None, coolHoldTemp=None,
-                holdHours=None, startDate=None, endDate=None, startTime=None, endTime=None):
-        """Set a hold at the given temperatures"""
+    def resumeProgram(self, thermostat_id):
+        """Resumes the program"""
 
-        if not heatHoldTemp and not coolHoldTemp:
-            raise ValueError("either 'heatHoldTemp' or 'coolHoldTemp' is required")
+        return self.post('thermostat', {
+            "selection": {
+                "selectionType":  "thermostats",
+                "selectionMatch": thermostat_id,
+            },
+            "functions": [{
+                "type": "resumeProgram",
+                "params": {
+                    "resumeAll": True,
+                }
+            }]
+        })
 
-        # defaults for these are the current temperature
-        if not heatHoldTemp:
-            heatHoldTemp = self._status[thermostat_id]['runtime']['desiredHeat']
-        else:
-            heatHoldTemp = int(heatHoldTemp * 10)
 
-        if not coolHoldTemp:
-            coolHoldTemp = self._status[thermostat_id]['runtime']['desiredCool']
-        else:
-            coolHoldTemp = int(coolHoldTemp * 10)
+    def setHold(self, thermostat_id, holdType='nextTransition', holdClimateRef=None,
+                heatHoldTemp=None, coolHoldTemp=None, holdHours=None,
+                startDate=None, endDate=None, startTime=None, endTime=None):
+        """Set a hold at the given temperatures or climate program
+        such as 'hoome', 'away', 'sleep'.
+        """
 
         params = {
             'holdType':     holdType,
-            'heatHoldTemp': heatHoldTemp,
-            'coolHoldTemp': coolHoldTemp,
         }
+
+        if holdClimateRef:
+            params['holdClimateRef'] = holdClimateRef
+        else:
+            if not heatHoldTemp and not coolHoldTemp:
+                raise ValueError("one of ('heatHoldTemp', 'coolHoldTemp', 'holdClimateRef') is required")
+
+            # defaults for these are the current temperature
+            if not heatHoldTemp:
+                heatHoldTemp = self._status[thermostat_id]['runtime']['desiredHeat']
+            else:
+                heatHoldTemp = int(heatHoldTemp * 10)
+
+            if not coolHoldTemp:
+                coolHoldTemp = self._status[thermostat_id]['runtime']['desiredCool']
+            else:
+                coolHoldTemp = int(coolHoldTemp * 10)
+
+            params['heatHoldTemp'] = heatHoldTemp,
+            params['coolHoldTemp'] = coolHoldTemp,
+
 
         if holdType == 'holdHours':
             params['holdHours'] = holdHours
