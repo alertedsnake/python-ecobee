@@ -597,7 +597,7 @@ class Sensor(object):
         """Return humidity (float) or None if not supported"""
         val = self._get_capability('humidity').get('value')
         if val:
-            return int(val) / 10.0
+            return int(val)
 
     @property
     def occupancy(self):
