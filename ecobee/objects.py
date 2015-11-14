@@ -202,6 +202,13 @@ class Sensor(object):
     def updated(self):
         return self.thermostat.updated
 
+    def can(self, key):
+        """Can this sensor do that?"""
+        for obj in self._status.get('capability', []):
+            if obj['type'] == key:
+                return True
+        return False
+
     def _get_capability(self, key):
         """Get a capability from the array"""
         for obj in self._status.get('capability', []):
