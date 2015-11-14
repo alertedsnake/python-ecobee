@@ -12,6 +12,8 @@ import requests
 import os
 import shelve
 
+from ecobee.objects import Thermostat, Sensor
+
 APIVERSION = '1'
 REPORT_COLUMNS = (
     'auxHeat1', 'auxHeat2', 'auxHeat3',
@@ -301,6 +303,76 @@ You have {expiry} minutes.
         return self.get('runtimeReport', data)
 
 
+    def resumeProgram(self, thermostat_id):
+        """Resumes the program"""
+
+        return self.post('thermostat', {
+            "selection": {
+                "selectionType":  "thermostats",
+                "selectionMatch": thermostat_id,
+            },
+            "functions": [{
+                "type": "resumeProgram",
+                "params": {
+                    "resumeAll": True,
+                }
+            }]
+        })
+
+
+    def setHold(self, thermostat_id, holdType='nextTransition', holdClimateRef=None,
+                heatHoldTemp=None, coolHoldTemp=None, holdHours=None,
+                startDate=None, endDate=None, startTime=None, endTime=None):
+        """Set a hold at the given temperatures or climate program
+        such as 'hoome', 'away', 'sleep'.
+        """
+
+        params = {
+            'holdType':     holdType,
+        }
+
+        if holdClimateRef:
+            params['holdClimateRef'] = holdClimateRef
+        else:
+            if not heatHoldTemp and not coolHoldTemp:
+                raise ValueError("one of ('heatHoldTemp', 'coolHoldTemp', 'holdClimateRef') is required")
+
+            # defaults for these are the current temperature
+            if not heatHoldTemp:
+                heatHoldTemp = self._status[thermostat_id]['runtime']['desiredHeat']
+            else:
+                heatHoldTemp = int(heatHoldTemp * 10)
+
+            if not coolHoldTemp:
+                coolHoldTemp = self._status[thermostat_id]['runtime']['desiredCool']
+            else:
+                coolHoldTemp = int(coolHoldTemp * 10)
+
+            params['heatHoldTemp'] = heatHoldTemp,
+            params['coolHoldTemp'] = coolHoldTemp,
+
+
+        if holdType == 'holdHours':
+            params['holdHours'] = holdHours
+
+        if holdType == 'dateTime':
+            params['startDate'] = startDate
+            params['endDate']   = endDate
+            params['startTime'] = startTime
+            params['endTime']   = endTime
+
+        return self.post('thermostat', {
+            "selection": {
+                "selectionType":  "thermostats",
+                "selectionMatch": thermostat_id,
+            },
+            "functions": [{
+                "type": "setHold",
+                "params": params,
+            }]
+        })
+
+
     def poll(self):
         """
         Return a list of thermostat IDs that have been updated since the last poll.
@@ -374,7 +446,7 @@ You have {expiry} minutes.
 
         url = self.url_api.format(endpoint=endpoint)
         try:
-            r = requests.get(url, data = json.dumps(data), headers=self._headers)
+            r = requests.post(url, data = json.dumps(data), headers=self._headers)
 
             if not r.ok:
                 self._handle_error(r)
@@ -383,6 +455,7 @@ You have {expiry} minutes.
 
         except requests.exceptions.ConnectionError as e:
             self.log.error(e)
+            self.log.error(r.request)
             raise EcobeeException("Connection error: {}".format(e)) from None
 
 
@@ -426,209 +499,3 @@ You have {expiry} minutes.
         except requests.exceptions.ConnectionError as e:
             self.log.error(e)
             raise EcobeeException("Connection error: {}".format(e)) from None
-
-
-class Thermostat(object):
-    """Ecobee thermostat.
-
-    This class is a thin wrapper around the data in
-    eapi._status[thermostat_id].
-
-    """
-
-    def __init__(self, eapi, thermostat_id):
-        self._eapi = eapi
-        self.id = thermostat_id
-        self.lastSeen = None
-
-    @property
-    def _status(self):
-        return self._eapi._status[self.id]
-
-    @property
-    def name(self):
-        """Thermostat name"""
-        return self._status.get('name', 'pending')
-
-    @property
-    def settings(self):
-        """Settings dict"""
-        return self._status.get('settings', {})
-
-    @property
-    def runtime(self):
-        """Runtime status dict"""
-        return self._status.get('runtime', {})
-
-    @property
-    def running(self):
-        """List of running equiptment"""
-        return self._status.get('equipmentStatus', [])
-
-    @property
-    def sensors(self):
-        """Sensors dict"""
-        return self._status.get('remoteSensors', {})
-
-    @property
-    def updated(self):
-        """When was this last updated"""
-        # not updated yet
-        if not self.lastSeen:
-            if self.id in self._eapi.lastSeen:
-                self.lastSeen = self._eapi.lastSeen[self.id]
-                return True
-
-        # updated
-        elif self.lastSeen < self._eapi.lastSeen[self.id]:
-            self.lastSeen = self._eapi.lastSeen[self.id]
-            return True
-
-        return False
-
-    @property
-    def state(self):
-        """What is the current hvac state?"""
-        if self.is_heating:
-            return 'heat'
-        if self.is_cooling:
-            return 'cool'
-        return 'idle'
-
-    @property
-    def is_fan(self):
-        """Is the fan on ?"""
-        return 'fan' in self.running
-
-    @property
-    def is_heating(self):
-        """Is this thing currently heating?"""
-        for key in ('heatPump', 'heatPump2', 'heatPump3', 'auxHeat1', 'auxHeat2', 'auxHeat3'):
-            if key in self.running:
-                return True
-        return False
-
-    @property
-    def is_cooling(self):
-        """Is this thing currently cooling?"""
-        for key in ('compCool1', 'compCool2'):
-            if key in self.running:
-                return True
-        return False
-
-
-    @property
-    def units(self):
-        """Returns C or F"""
-        if self.settings.get('useCelsius', False):
-            return 'C'
-        return 'F'
-
-    def get_sensor(self, id):
-        """Return a sensor object given the ID"""
-        if id in self.sensors:
-            return Sensor(self, id)
-
-    def list_sensors(self):
-        """Return a list of sensor objects"""
-        return list(Sensor(self, k) for k in self.sensors.keys())
-
-
-    def poll(self):
-        """Polls for an update.  Returns true if there's data available"""
-        return self._eapi.poll()
-
-
-    def update(self):
-        """Calls update() on this thermostat"""
-        if self.id in self.poll():
-            return self._eapi.update(self.id)
-
-
-    def _get_report(self, **kwargs):
-        """Wrapper for eapi.thermostatReport"""
-
-        try:
-            data = self._eapi.thermostatReport(self.id, **kwargs)
-            return data.get(self.id, {})
-        except EcobeeException:
-            pass
-
-
-class Sensor(object):
-    """An Ecobee remote sensor
-
-    This class is a thin wrapper around the data in
-    eapi._status[thermostat.id]['remoteSensors'][sensor_id].
-
-    """
-
-    def __init__(self, thermostat, sensor_id):
-        self.thermostat = thermostat
-        self.id = sensor_id
-
-    @property
-    def _eapi(self):
-        return self.thermostat._eapi
-
-    @property
-    def _status(self):
-        return self.thermostat.sensors.get(self.id, {})
-
-    @property
-    def name(self):
-        """Sensor name"""
-        return self._status.get('name', 'pending')
-
-    @property
-    def type(self):
-        """Sensor type"""
-        return self._status.get('type')
-
-    @property
-    def temperature(self):
-        """Return temperature (float) or None if not supported"""
-        val = self._get_capability('temperature').get('value')
-        if val:
-            return int(val) / 10.0
-
-    @property
-    def humidity(self):
-        """Return humidity (float) or None if not supported"""
-        val = self._get_capability('humidity').get('value')
-        if val:
-            return int(val)
-
-    @property
-    def occupancy(self):
-        """Return occupancy (boolean) or None if not supported"""
-        val = self._get_capability('occupancy').get('value')
-        if val:
-            return val == 'true'
-
-    @property
-    def updated(self):
-        return self.thermostat.updated
-
-    def can(self, key):
-        """Can this sensor do that?"""
-        for obj in self._status.get('capability', []):
-            if obj['type'] == key:
-                return True
-        return False
-
-    def _get_capability(self, key):
-        """Get a capability from the array"""
-        for obj in self._status.get('capability', []):
-            if obj['type'] == key:
-                return obj
-        return {}
-
-    def poll(self):
-        """Calls the parent's poll()"""
-        return self.thermostat.poll()
-
-    def update(self):
-        """Calls the parent's update()"""
-        self.thermostat.update()
-
