@@ -486,6 +486,43 @@ class Thermostat(object):
 
         return False
 
+    @property
+    def state(self):
+        """What is the current hvac state?"""
+        if self.is_heating:
+            return 'heat'
+        if self.is_cooling:
+            return 'cool'
+        return 'idle'
+
+    @property
+    def is_fan(self):
+        """Is the fan on ?"""
+        return 'fan' in self.running
+
+    @property
+    def is_heating(self):
+        """Is this thing currently heating?"""
+        for key in ('heatPump', 'heatPump2', 'heatPump3', 'auxHeat1', 'auxHeat2', 'auxHeat3'):
+            if key in self.running:
+                return True
+        return False
+
+    @property
+    def is_cooling(self):
+        """Is this thing currently cooling?"""
+        for key in ('compCool1', 'compCool2'):
+            if key in self.running:
+                return True
+        return False
+
+
+    @property
+    def units(self):
+        """Returns C or F"""
+        if self.settings.get('useCelsius', False):
+            return 'C'
+        return 'F'
 
     def get_sensor(self, id):
         """Return a sensor object given the ID"""
@@ -572,6 +609,13 @@ class Sensor(object):
     @property
     def updated(self):
         return self.thermostat.updated
+
+    def can(self, key):
+        """Can this sensor do that?"""
+        for obj in self._status.get('capability', []):
+            if obj['type'] == key:
+                return True
+        return False
 
     def _get_capability(self, key):
         """Get a capability from the array"""
