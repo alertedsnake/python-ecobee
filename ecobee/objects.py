@@ -65,6 +65,11 @@ class Thermostat(object):
         return False
 
     @property
+    def mode(self):
+        """What is the current HVAC mode?"""
+        return self.settings.get('hvacMode')
+
+    @property
     def state(self):
         """What is the current hvac state?"""
         if self.is_heating:
@@ -76,11 +81,15 @@ class Thermostat(object):
     @property
     def is_fan(self):
         """Is the fan on ?"""
+        if not self.runtime:
+            return None
         return 'fan' in self.running
 
     @property
     def is_heating(self):
         """Is this thing currently heating?"""
+        if not self.runtime:
+            return None
         for key in ('heatPump', 'heatPump2', 'heatPump3', 'auxHeat1', 'auxHeat2', 'auxHeat3'):
             if key in self.running:
                 return True
@@ -89,10 +98,45 @@ class Thermostat(object):
     @property
     def is_cooling(self):
         """Is this thing currently cooling?"""
+        if not self.runtime:
+            return None
         for key in ('compCool1', 'compCool2'):
             if key in self.running:
                 return True
         return False
+
+
+    @property
+    def target_temperature(self):
+        """Return target humidity, independent of mode"""
+
+        if not self.runtime:
+            return None
+        if self.mode == 'heat' or (self.mode == 'auto' and self.is_heating):
+            return self.runtime.get('desiredHeat') / 10.0
+        if self.mode == 'cool' or (self.mode == 'auto' and self.is_cooling):
+            return self.runtime.get('desiredCool') / 10.0
+        return None
+
+    @property
+    def target_humidity(self):
+        """Return target humidity"""
+        if not self.runtime:
+            return None
+        return self.runtime.get('desiredHumidity')
+
+
+    @property
+    def current_temperature(self):
+        if not self.runtime:
+            return None
+        return self.runtime.get('actualTemperature') / 10.0
+
+    @property
+    def current_humidity(self):
+        if not self.runtime:
+            return None
+        return self.runtime.get('actualHumidity')
 
 
     def get_sensor(self, id):
