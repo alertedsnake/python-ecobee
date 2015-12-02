@@ -12,7 +12,7 @@ import requests
 import os
 import shelve
 
-from ecobee.objects import Thermostat, Sensor
+from ecobee.objects import Thermostat
 
 APIVERSION = '1'
 REPORT_COLUMNS = (
@@ -93,7 +93,7 @@ class Client(object):
                 self.auth = shelve.open(os.path.join(os.getenv('HOME'), '.config', 'ecobee'))
 
         # authorize on start
-        self.authorize_refresh()
+        self.authorize_refresh(force=True)
 
 
     @property
@@ -161,7 +161,7 @@ You have {expiry} minutes.
         self._authorize_update(response)
 
 
-    def authorize_refresh(self, force=True):
+    def authorize_refresh(self, force=False):
         """Refresh authorization"""
 
         # no refresh token means we go authorize
@@ -170,7 +170,8 @@ You have {expiry} minutes.
             return self.authorize_start()
 
         # don't refresh if not yet expired
-        if 'expiration' in self.auth and self.auth['expiration'] > datetime.datetime.now():
+        if not force and ('expiration' in self.auth and
+                          self.auth['expiration'] > datetime.datetime.now()):
             return
 
         self.log.info("refreshing authorization")
@@ -207,6 +208,11 @@ You have {expiry} minutes.
                                 "selectionMatch": "",
                             }
                         })
+
+        # might not have got a useful response,
+        # like when we have to refresh authentication
+        if not data:
+            return
 
         # go through the returned thermostat IDs and add
         # to the list we've cached if we haven't seen
@@ -383,6 +389,10 @@ You have {expiry} minutes.
             which is the shortest interval at which data might change.
         """
         summary = self.thermostatSummary()
+        # may not have got a useful response
+        if not summary:
+            return []
+
         updated = []
         if 'revisionList' not in summary:
             self.log.warn("Couldn't find revisionList in the summary output")
@@ -462,8 +472,14 @@ You have {expiry} minutes.
     def _handle_error(self, response):
         try:
             data = response.json()
+            # code 16 = auth needs refresh
+            if data['status']['code'] == 14:
+                self.log.warning("error 14: refreshing authentication")
+                return self.authorize_refresh(force=True)
+
             # code 16 = auth revoked, clear the token and start again
             if data['status']['code'] == 16:
+                self.log.warning("error 16: restarting authentication")
                 self.auth['refresh_token'] = None
                 self.auth['token_type'] = None
                 return self.authorize_start()
