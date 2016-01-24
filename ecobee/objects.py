@@ -5,6 +5,8 @@ A simple library to talk to an Ecobee (https://www.ecobee.com) thermostat.
 
 __author__ = 'Michael Stella <ecobee@thismetalsky.org>'
 
+from ecobee import EcobeeException
+
 
 class Thermostat(object):
     """Ecobee thermostat.
@@ -226,14 +228,20 @@ class Sensor(object):
         """Return temperature (float) or None if not supported"""
         val = self._get_capability('temperature').get('value')
         if val:
-            return int(val) / 10.0
+            try:
+                return int(val) / 10.0
+            except ValueError:
+                return None
 
     @property
     def humidity(self):
         """Return humidity (float) or None if not supported"""
         val = self._get_capability('humidity').get('value')
         if val:
-            return int(val)
+            try:
+                return int(val)
+            except ValueError:
+                return None
 
     @property
     def occupancy(self):
