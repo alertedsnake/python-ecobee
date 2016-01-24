@@ -474,7 +474,7 @@ You have {expiry} minutes.
             data = response.json()
             # code 16 = auth needs refresh
             if data['status']['code'] == 14:
-                self.log.warning("error 14: refreshing authentication")
+                self.log.warning("error 14: auth token needs refresh")
                 return self.authorize_refresh(force=True)
 
             # code 16 = auth revoked, clear the token and start again
