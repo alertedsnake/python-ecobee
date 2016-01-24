@@ -5,8 +5,6 @@ A simple library to talk to an Ecobee (https://www.ecobee.com) thermostat.
 
 __author__ = 'Michael Stella <ecobee@thismetalsky.org>'
 
-from ecobee import EcobeeException
-
 
 class Thermostat(object):
     """Ecobee thermostat.
@@ -160,16 +158,6 @@ class Thermostat(object):
         """Calls update() on this thermostat"""
         if self.id in self.poll():
             return self._eapi.update(self.id)
-
-
-    def _get_report(self, **kwargs):
-        """Wrapper for eapi.thermostatReport"""
-
-        try:
-            data = self._eapi.thermostatReport(self.id, **kwargs)
-            return data.get(self.id, {})
-        except EcobeeException:
-            pass
 
 
     def setHold(self, **kwargs):
