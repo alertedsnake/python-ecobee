@@ -9,7 +9,7 @@ thermostat.
 
     >>> import ecobee
 
-    >>> eapi = ecobee.Ecobee(APIKEY, [THERMOSTAT_ID])
+    >>> eapi = ecobee.Client(APIKEY, [THERMOSTAT_ID])
     >>> eapi.update()
 
     >>> t = eapi.get_thermostat(THERMOSTAT_ID)
