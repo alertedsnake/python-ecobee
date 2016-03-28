@@ -167,6 +167,7 @@ You have {expiry} minutes.
         # no refresh token means we go authorize
         if not self.auth.get('refresh_token'):
             self.log.info("No refresh token, authorizing.")
+            self.auth.token_type = None
             return self.authorize_start()
 
         # don't refresh if not yet expired
