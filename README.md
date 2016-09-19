@@ -41,6 +41,6 @@ Ecobee has lots of great documentation here:
 
 ## Python version
 
-This library was designed to work with Python 3.  It seems to work with 2.7.10,
-but I haven't done any real testing, and probably don't intend to.
+This library was designed to work with Python 3.  Parts may work with Python
+2.7, but I don't intend to support it at all, so you're on your own there.
 
